@@ -1,0 +1,45 @@
+@startuml
+!includeurl https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Container.puml
+title C4 — Container (To-Be: Кинобездна)
+
+Person(dev, "Разработчик", "Мобильный / веб / Smart TV клиенты")
+Person(user, "Пользователь", "Мобильный / веб / Smart TV клиенты")
+
+System_Boundary(system, "Онлайн-кинотеатр «Кинобездна»") {
+
+  Container(proxyService, "Proxy Service", "Java + Spring Boot", "Фасад системы, маршрутизация запросов")
+
+  Container_Boundary(eventing, "События (MVP)") {
+    Container(eventsService, "Events Service", "Spring Boot", "Пишет и читает события через Kafka")
+    ContainerQueue(kafka, "Kafka", "Kafka", "Брокер сообщений")
+  }
+
+  Container_Boundary(legacy, "Legacy-домены (в монолите)") {
+    Container(monolith, "Monolith", "Go", "Аутентификация, каталог, оценки, избранное, платежи, подписки")
+    ContainerDb(monolithDb, "Monolith DB", "PostgreSQL", "Пользователи, платежи, видео, подписки, метаданные и т.п.")
+  }
+
+  Container_Boundary(moviesDomain, "Домен фильмов") {
+    Container(moviesService, "Movies Service", "Go", "Метаданные фильмов (выделенный сервис, работает с БД монолита)")
+  }
+}
+
+System_Ext(rec, "Рекомендательная система", "Формирует подборки")
+System_Ext(pay, "Платёжная система", "Синхронные интеграции")
+System_Ext(content, "Онлайн-кинотеатры", "Внешние потоки/файлы")
+
+Rel(user, proxyService, "Смотрит каталог, авторизуется, ставит оценки, оформляет подписку", "HTTP")
+Rel(proxyService, monolith, "Перенаправляет запросы на старую версию сервиса", "HTTP")
+Rel(proxyService, moviesService, "Перенаправляет запросы на новую версию сервиса", "HTTP")
+Rel(monolith, monolithDb, "Читает и пишет доменные данные", "SQL")
+Rel(moviesService, monolithDb, "Читает и пишет метаданные фильмов", "SQL")
+Rel(monolith, rec, "Запрашивает рекомендации для пользователя", "HTTP")
+Rel(monolith, pay, "Создаёт платежи и проверяет статусы", "HTTP")
+Rel(monolith, content, "Получает ссылки/потоки для воспроизведения", "HTTP")
+
+Rel(dev, eventsService, "Тестовые события, связанные с фильмами, пользователями и платежами", "HTTP")
+
+Rel(eventsService, kafka, "Запись событий", "")
+Rel(kafka, eventsService, "Чтение событий", "")
+
+@enduml
